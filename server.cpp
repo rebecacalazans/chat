@@ -38,7 +38,6 @@ void send_thread() {
             mutsocks.lock();
               socks.erase(socks.begin()+i);
             mutsocks.unlock();
-            ok = 0;
           }
         }
       }

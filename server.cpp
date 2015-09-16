@@ -88,7 +88,7 @@ int main(int argc, char **argv) {
   memset(&addr.sin_zero,0,sizeof(addr.sin_zero));
 
   if(bind(sockfd,(struct sockaddr*)&addr,sizeof(addr)) == -1) {
-    perror("Erro na funcao bind()\n");
+    perror("Erro na funcao bind()");
     return 1;
   }
   if(listen(sockfd,1) == -1) {
@@ -101,7 +101,7 @@ int main(int argc, char **argv) {
   while(1) {
   sock_client = accept(sockfd,0,0);
   if(sock_client == -1) {
-    perror("Erro na funcao accept()\n");
+    perror("Erro na funcao accept()");
     return 1;
   }
   else {

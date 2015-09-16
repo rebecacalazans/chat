@@ -59,6 +59,7 @@ void rcv_thread(int sockfd) {
     }
     else {
     msg[mlen] = '\0';
+    printf("Received:\n%s\n", msg);
     mutmsgs.lock();
       msgs.push(msg);
     mutmsgs.unlock();

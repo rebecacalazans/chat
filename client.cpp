@@ -89,9 +89,13 @@ void send_thread(int sockfd) {
         printf("\n");
         break;
       }
-
     }
     stopInput();
+
+    struct winsize w;
+    ioctl(STDOUT_FILENO, TIOCGWINSZ, &w);
+    int meslines = (strlen(message) + w.ws_col - 1) / w.ws_col;
+    printf("\033[%dA", meslines);
 
     mutmessage.lock();
     sprintf(packet, "\033[%dm%s\033[0m: %s", color, name, message);
@@ -124,10 +128,11 @@ void rcv_thread(int sockfd) {
     // Get terminal size
     struct winsize w;
     ioctl(STDOUT_FILENO, TIOCGWINSZ, &w);
-    int meslines = (strlen(message) + 2) / w.ws_col;
     int col = w.ws_col - strlen(packet) + 9; // Get terminal size minus packet size (except escape sequences (9 chars))
+    int meslines = (strlen(message) + w.ws_col - 1) / w.ws_col-1;
+    if (meslines >= 0)
+      printf("\033[%dA", meslines);
 
-    printf("\033[%dA", meslines); // Move to the beginning of message to erase it
     printf("\r%s", packet);
     for (int i = 0; i < col; ++i) {
       printf(" ");

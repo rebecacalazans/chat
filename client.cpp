@@ -95,7 +95,7 @@ void send_thread(int sockfd) {
 
     printf("\033[1A");
     mutmessage.lock();
-    sprintf(packet, "\r\033[%dm%s\033[0m: %s", color, name, message);
+    sprintf(packet, "\033[%dm%s\033[0m: %s", color, name, message);
     mutmessage.unlock();
 
     int mlen = send(sockfd, packet, strlen(packet), 0);
@@ -122,7 +122,17 @@ void rcv_thread(int sockfd) {
     }
     packet[mlen] = '\0';
 
-    printf("%s\n> ", packet);
+    // Get terminal size
+    struct winsize w;
+    ioctl(STDOUT_FILENO, TIOCGWINSZ, &w);
+    int col = w.ws_col - strlen(packet)-2;
+
+    printf("\r%s", packet);
+    for (int i = 0; i < col; ++i) {
+      printf(" ");
+    }
+
+    printf("\n> ");
 
     mutmessage.lock();
     printf("%s", message);

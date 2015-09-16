@@ -145,11 +145,11 @@ int main(int argc, char **argv) {
       mutsocks.lock();
       socks.push_back(sock_client);
       mutsocks.unlock();
-      trcv.push_back(std::thread(&rcv_thread,sock_client));
+      std::thread(&rcv_thread,sock_client).detach();
     }
   }
 
-    tsend.join();
+  tsend.join();
   for(int i = 0; i < socks.size(); i++) {
     close(socks[i]);
   }

@@ -22,26 +22,58 @@ std::mutex mutmsgs, mutsocks;
 void send_thread() {
   int ok=1;
   while(ok) {
-    if(!msgs.empty()) {
+    mutmsgs.lock();
+    bool e = msgs.empty();
+    mutmsgs.unlock();
+
+    if(!e) {
 
       mutmsgs.lock();
         char* msg = msgs.front();
         msgs.pop();
       mutmsgs.unlock();
 
-      if(!socks.empty()) {
-        for(int i = 0; i < socks.size(); i++) {
-          int mlen = send(socks[i], msg, MAX, 0);
+      mutsocks.lock();
+      bool e = socks.empty();
+      mutsocks.unlock();
+
+      printf("\033[94mSending message to all clients\033[0m\n");
+
+      if(!e) {
+        std::vector<int> toremove;
+
+        for(int i = 0; ; i++) {
+          mutsocks.lock();
+          int s = socks.size();
+          mutsocks.unlock();
+
+          if (i >= s) break;
+
+          printf("\033[94mSending to client\033[0m %d: ", socks[i]);
+
+          int mlen = send(socks[i], msg, strlen(msg), 0);
           if(mlen == -1) {
             //perror("Erro ao enviar mensagem socket %d", i);
+            printf("\033[31mClient disconnected!\033[0m\n");
             close(socks[i]);
-            mutsocks.lock();
-              socks.erase(socks.begin()+i);
-            mutsocks.unlock();
+            toremove.push_back(i);
+          } else {
+            printf("\033[32mSucceed!\033[0m\n");
           }
         }
+
+        if (toremove.size() > 0) {
+          mutsocks.lock();
+          for (int i = 0; i < (int)toremove.size(); ++i) {
+            socks.erase(socks.begin()+toremove[i]);
+          }
+          mutsocks.unlock();
+        }
+      } else {
+        printf("\033[31mNo clients connected!\033[0m\n");
       }
-      free(msg);
+
+      delete msg;
     }
   }
 }
@@ -58,10 +90,11 @@ void rcv_thread(int sockfd) {
       ok = 0;
     }
     else {
-    msg[mlen] = '\0';
-    mutmsgs.lock();
+      msg[mlen] = '\0';
+      printf("\033[94mReceived from\033[0m %d: %s\n", sockfd, msg);
+      mutmsgs.lock();
       msgs.push(msg);
-    mutmsgs.unlock();
+      mutmsgs.unlock();
     }
   }
 }
@@ -98,17 +131,22 @@ int main(int argc, char **argv) {
   tsend = std::thread(&send_thread);
 
   while(1) {
-  sock_client = accept(sockfd,0,0);
-  if(sock_client == -1) {
-    perror("Erro na funcao accept()");
-    return 1;
-  }
-  else {
-    std::thread(&rcv_thread,sock_client).detach();
-    mutsocks.lock();
+    sock_client = accept(sockfd,0,0);
+    if(sock_client == -1) {
+      perror("Erro na funcao accept()");
+      return 1;
+    }
+    else {
+      // Get client info
+      socklen_t addr_size = sizeof(struct sockaddr_in);
+      int res = getpeername(sock_client, (struct sockaddr*)&addr, &addr_size);
+      printf("\033[94mClient connected\033[0m: %d (%s)\n", sock_client, inet_ntoa(addr.sin_addr));
+
+      mutsocks.lock();
       socks.push_back(sock_client);
-    mutsocks.unlock();
-  }
+      mutsocks.unlock();
+      trcv.push_back(std::thread(&rcv_thread,sock_client));
+    }
   }
 
     tsend.join();

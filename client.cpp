@@ -1,17 +1,41 @@
 #include <stdio.h>
 #include <sys/types.h>
 #include <sys/socket.h>
+#include <sys/ioctl.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <netdb.h>
+#include <termios.h>
 #include <string.h>
 #include <unistd.h>
 #include <stdlib.h>
 #include <thread>
+#include <mutex>
 #define MAX 1024
 
 char name[20];
 char message[MAX];
+
+std::mutex mutmessage;
+
+struct termios oldtio = {};
+void startInput() {
+  if (tcgetattr(0, &oldtio) < 0)
+    perror("tcsetattr()");
+
+  struct termios newtio = oldtio;
+  newtio.c_lflag &= ~ICANON;
+  newtio.c_lflag &= ~ECHO;
+  newtio.c_cc[VMIN] = 1;
+  newtio.c_cc[VTIME] = 0;
+  if (tcsetattr(0, TCSANOW, &newtio) < 0)
+    perror("tcsetattr ICANON");
+}
+
+void stopInput() {
+  if (tcsetattr(0, TCSANOW, &oldtio) < 0)
+    perror ("tcsetattr ~ICANON");
+}
 
 void send_thread(int sockfd) {
   int color = 0;
@@ -22,10 +46,61 @@ void send_thread(int sockfd) {
   char packet[MAX];
 
   while(1) {
-    fgets(message, MAX - strlen(name) - 2, stdin);
-    printf("\033[1A");
-    sprintf(packet, "\r\033[%dm%s\033[0m: %s", color, name, message);
-    memset(message, 0, sizeof(message));
+    mutmessage.lock();
+    message[0] = '\0';
+    mutmessage.unlock();
+
+    int i = 0;
+
+    startInput();
+    while (1) {
+      char c = getchar();
+      if (c == '\n') {
+        if (i == 0) continue;
+        printf("\n");
+        break;
+      }
+
+      if (c == 0x7f) { // Backspace
+        if (i > 0) {
+          mutmessage.lock();
+          message[--i] = '\0';
+          mutmessage.unlock();
+
+          printf("\b \b");
+        }
+      } else if (c == 27) { // Escape sequence
+        // Ignore escape sequence
+        c = getchar();
+        c = getchar();
+        continue;
+      } else {
+        mutmessage.lock();
+        message[i++] = c;
+        message[i] = '\0';
+        mutmessage.unlock();
+        printf("%c", c);
+      }
+
+      if (i == MAX-1) {
+        mutmessage.lock();
+        message[i] = '\n';
+        mutmessage.unlock();
+        printf("\n");
+        break;
+      }
+    }
+    stopInput();
+
+    struct winsize w;
+    ioctl(STDOUT_FILENO, TIOCGWINSZ, &w);
+    int meslines = (strlen(message) + w.ws_col - 1) / w.ws_col;
+    printf("\033[%dA", meslines);
+
+    mutmessage.lock();
+    sprintf(packet, "\033[%dm%s\033[0m: %s", color, name, message);
+    mutmessage.unlock();
+
     int mlen = send(sockfd, packet, strlen(packet), 0);
     if (mlen == -1 || mlen == 0) {
       printf("Erro ao enviar mensagem");
@@ -43,13 +118,32 @@ void rcv_thread(int sockfd) {
 
   while(1) {
     memset(packet, 0, MAX);
-    int mlen = recv(sockfd, packet, MAX,0);
+    int mlen = recv(sockfd, packet, MAX, 0);
     if(mlen == -1) {
       perror("Erro ao receber mensagem\n");
       exit (1);
     }
     packet[mlen] = '\0';
-    printf("\a%s", packet);
+
+    // Get terminal size
+    struct winsize w;
+    ioctl(STDOUT_FILENO, TIOCGWINSZ, &w);
+    int col = w.ws_col - strlen(packet) + 9; // Get terminal size minus packet size (except escape sequences (9 chars))
+    int meslines = (strlen(message) + w.ws_col - 1) / w.ws_col-1;
+    if (meslines >= 0)
+      printf("\033[%dA", meslines);
+
+    printf("\r%s", packet);
+    for (int i = 0; i < col; ++i) {
+      printf(" ");
+    }
+
+    printf("\n> ");
+
+    mutmessage.lock();
+    printf("%s", message);
+    mutmessage.unlock();
+    fflush(stdout);
   }
 }
 
@@ -83,6 +177,8 @@ int main(int argc, char **argv) {
   printf("Digite seu nome: ");
   fgets(name, 18, stdin);
   name[strlen(name) - 1] = '\0';
+  printf("> ");
+  fflush(stdout);
 
   tsend = std::thread(&send_thread, sockfd);
   trcv = std::thread(&rcv_thread, sockfd);

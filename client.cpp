@@ -49,7 +49,7 @@ void rcv_thread(int sockfd) {
       exit (1);
     }
     packet[mlen] = '\0';
-    printf("%s\n", packet);
+    printf("\a%s", packet);
   }
 }
 
@@ -58,12 +58,6 @@ int main(int argc, char **argv) {
   std::thread tsend, trcv;
   int sockfd;
   struct sockaddr_in addr;
-  unsigned short port;
-
-  if (argc < 2) {
-    perror("Não foi encontrado IP de destino");
-    return 1;
-  }
 
   sockfd = socket(AF_INET, SOCK_STREAM, 0);
 
@@ -72,15 +66,12 @@ int main(int argc, char **argv) {
     return 1;
   }
 
-  if (argc > 2) {
-    port = (unsigned short) atoi(argv[2]);
-  }
-  else
-    port = 1234;
-
   addr.sin_family = AF_INET;
-  addr.sin_port   = htons(port);
-  addr.sin_addr.s_addr = inet_addr(argv[1]);
+  addr.sin_port   = htons(5600);
+  if (argc < 2)
+    addr.sin_addr.s_addr = inet_addr("187.45.160.148");
+  else
+    addr.sin_addr.s_addr = inet_addr(argv[1]);
   memset(&addr.sin_zero,0,sizeof(addr.sin_zero));
 
   if(connect(sockfd,(struct sockaddr*)&addr,sizeof(addr)) != 0)

@@ -8,59 +8,71 @@
 #include <unistd.h>
 #include <stdlib.h>
 #include <thread>
+#include <vector>
+#include <queue>
+#include <mutex>
+
 #define MAX 1024
 
-char name[20];
+std::vector<int> socks;
+std::queue<char*> msgs;
+std::mutex mutmsgs, mutsocks;
 
-void send_thread(int sockfd) {
-  strcat(name, ": ");
-  char* str = (char*) malloc(MAX);
-  strcpy(str, name);
-  char* packet = str + strlen(name);
 
-  if (!packet) {
-    perror("Falha na alocação da memória");
-    exit (1);
-  }
+void send_thread() {
+  int ok=1;
+  while(ok) {
+    if(!msgs.empty()) {
 
-  while(1) {
-    memset(packet, 0, MAX - strlen(name));
-    fgets(packet, MAX - strlen(name), stdin);
-      int mlen = send(sockfd, str, MAX - strlen(name), 0);
-    if (mlen == -1 || mlen == 0) {
-      printf("Erro ao enviar mensagem");
-      exit (1);
+      mutmsgs.lock();
+        char* msg = msgs.front();
+        msgs.pop();
+      mutmsgs.unlock();
+
+      if(!socks.empty()) {
+        for(int i = 0; i < socks.size(); i++) {
+          int mlen = send(socks[i], msg, MAX, 0);
+          if(mlen == -1) {
+            //perror("Erro ao enviar mensagem socket %d", i);
+            close(socks[i]);
+            mutsocks.lock();
+              socks.erase(socks.begin()+i);
+            mutsocks.unlock();
+            ok = 0;
+          }
+        }
+      }
+      free(msg);
     }
   }
 }
 
 void rcv_thread(int sockfd) {
-  char* packet = (char*) malloc(MAX);
-  if (!packet) {
-    perror("Falha na alocação da memória");
-    exit (1);
-  }
-
-  while(1) {
-    memset(packet, 0, MAX);
-    int mlen = recv(sockfd, packet, MAX,0);
-    if(mlen == -1) {
-      perror("Erro ao receber mensagem\n");
-      exit (1);
+  int ok=1;
+  while(ok) {
+    char* msg = (char*) malloc(MAX);
+    memset(msg, 0, MAX);
+    int mlen = recv(sockfd, msg, MAX,0);
+    if(mlen == -1 || mlen == 0) {
+      //perror("Erro ao receber mensagem socket");
+      close(sockfd);
+      ok = 0;
     }
-    packet[mlen] = '\0';
-    printf("%s\n", packet);
+    else {
+    msg[mlen] = '\0';
+    mutmsgs.lock();
+      msgs.push(msg);
+    mutmsgs.unlock();
+    }
   }
 }
 
 int main(int argc, char **argv) {
 
   std::thread tsend;
-  std::thread trcv;
-  int sockfd;
-  int sock_client;
+  std::vector<std::thread> trcv;
+  int sockfd, sock_client;
   struct sockaddr_in addr;
-  unsigned short port;
 
   sockfd = socket(AF_INET, SOCK_STREAM, 0);
 
@@ -69,14 +81,9 @@ int main(int argc, char **argv) {
     return 1;
   }
 
-  if (argc > 1) {
-    port = (unsigned short) atoi(argv[1]);
-  }
-  else
-    port = 1234;
 
   addr.sin_family = AF_INET;
-  addr.sin_port   = htons(port);
+  addr.sin_port   = htons(5600);
   addr.sin_addr.s_addr = INADDR_ANY;
 
   memset(&addr.sin_zero,0,sizeof(addr.sin_zero));
@@ -85,32 +92,35 @@ int main(int argc, char **argv) {
     perror("Erro na funcao bind()\n");
     return 1;
   }
-
   if(listen(sockfd,1) == -1) {
     printf("Erro na funcao listen()\n");
     return 1;
   }
 
-  printf("Aguardando conexoes...\n");
+  tsend = std::thread(&send_thread);
 
+  while(1) {
   sock_client = accept(sockfd,0,0);
-
   if(sock_client == -1) {
     perror("Erro na funcao accept()\n");
     return 1;
   }
+  else {
+    trcv.push_back(std::thread(&rcv_thread,sock_client));
+    mutsocks.lock();
+      socks.push_back(sock_client);
+    mutsocks.unlock();
+  }
+  }
 
-  printf("Digite seu nome: ");
-  fgets(name, 18, stdin);
-  name[strlen(name) - 1] = '\0';
+  for(int i = 0; i < trcv.size(); i++) {
+  trcv[i].join();
+  }
+    tsend.join();
+  for(int i = 0; i < socks.size(); i++) {
+    close(socks[i]);
+  }
 
-  tsend = std::thread(&send_thread, sock_client);
-  trcv = std::thread(&rcv_thread, sock_client);
-
-  tsend.join();
-  trcv.join();
-
-  close(sock_client);
   close(sockfd);
   return 0;
 }

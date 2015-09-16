@@ -102,7 +102,6 @@ void rcv_thread(int sockfd) {
 int main(int argc, char **argv) {
 
   std::thread tsend;
-  std::vector<std::thread> trcv;
   int sockfd, sock_client;
   struct sockaddr_in addr;
 
@@ -150,9 +149,6 @@ int main(int argc, char **argv) {
     }
   }
 
-  for(int i = 0; i < trcv.size(); i++) {
-  trcv[i].join();
-  }
     tsend.join();
   for(int i = 0; i < socks.size(); i++) {
     close(socks[i]);

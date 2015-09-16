@@ -13,10 +13,16 @@
 char name[20];
 
 void send_thread(int sockfd) {
+  int color = 0;
+  for (int i = 0; i < (int)strlen(name); ++i)
+    color += name[i];
+  color = (color % 7) + 31;
+
   strcat(name, ": ");
   char* str = (char*) malloc(MAX);
-  strcpy(str, name);
-  char* packet = str + strlen(name);
+  //strcpy(str, name);
+  sprintf(str, "\x1B[%dm%s\x1B[0m", color, name);
+  char* packet = str + strlen(str);
 
   if (!packet) {
     perror("Falha na alocação da memória");
@@ -24,9 +30,9 @@ void send_thread(int sockfd) {
   }
 
   while(1) {
-    memset(packet, 0, MAX - strlen(name));
-    fgets(packet, MAX - strlen(name), stdin);
-    int mlen = send(sockfd, str, MAX - strlen(name), 0);
+    memset(packet, 0, MAX - strlen(str));
+    fgets(packet, MAX - strlen(str), stdin);
+    int mlen = send(sockfd, str, MAX - strlen(str), 0);
     if (mlen == -1 || mlen == 0) {
       printf("Erro ao enviar mensagem");
       exit (1);

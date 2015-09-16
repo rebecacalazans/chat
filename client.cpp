@@ -22,7 +22,6 @@ void send_thread(int sockfd) {
   char* str = (char*) malloc(MAX);
   //strcpy(str, name);
   sprintf(str, "\x1B[%dm%s\x1B[0m", color, name);
-  printf("%s\n", str);
   char* packet = str + strlen(str);
 
   if (!packet) {

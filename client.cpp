@@ -24,7 +24,7 @@ void send_thread(int sockfd) {
   while(1) {
     fgets(message, MAX - strlen(name) - 2, stdin);
     printf("\033[1A");
-    sprintf(packet, "\r\033[%dm%s\033[0m: %s", color, name, message);
+    sprintf(packet, "\r\033[%dm%s\033[0m: %s\033[K", color, name, message);
     memset(message, 0, sizeof(message));
     int mlen = send(sockfd, packet, strlen(packet), 0);
     if (mlen == -1 || mlen == 0) {
@@ -43,13 +43,14 @@ void rcv_thread(int sockfd) {
 
   while(1) {
     memset(packet, 0, MAX);
-    int mlen = recv(sockfd, packet, MAX,0);
+    int mlen = recv(sockfd, packet, MAX, 0);
     if(mlen == -1) {
       perror("Erro ao receber mensagem\n");
       exit (1);
     }
     packet[mlen] = '\0';
-    printf("\a%s", packet);
+    printf("%s> ", packet);
+    fflush(stdout);
   }
 }
 

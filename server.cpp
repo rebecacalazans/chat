@@ -38,7 +38,11 @@ void send_thread() {
       bool e = socks.empty();
       mutsocks.unlock();
 
+      printf("\033[94mSending message to all clients\033[0m\n");
+
       if(!e) {
+        std::vector<int> toremove;
+
         for(int i = 0; ; i++) {
           mutsocks.lock();
           int s = socks.size();
@@ -46,15 +50,28 @@ void send_thread() {
 
           if (i >= s) break;
 
+          printf("\033[94mSending to client\033[0m %d: ", socks[i]);
+
           int mlen = send(socks[i], msg, strlen(msg), 0);
           if(mlen == -1) {
             //perror("Erro ao enviar mensagem socket %d", i);
+            printf("\033[31mClient disconnected!\033[0m\n");
             close(socks[i]);
-            mutsocks.lock();
-              socks.erase(socks.begin()+i);
-            mutsocks.unlock();
+            toremove.push_back(i);
+          } else {
+            printf("\033[32mSucceed!\033[0m\n");
           }
         }
+
+        if (toremove.size() > 0) {
+          mutsocks.lock();
+          for (int i = 0; i < (int)toremove.size(); ++i) {
+            socks.erase(socks.begin()+toremove[i]);
+          }
+          mutsocks.unlock();
+        }
+      } else {
+        printf("\033[31mNo clients connected!\033[0m\n");
       }
     }
   }
@@ -73,7 +90,7 @@ void rcv_thread(int sockfd) {
     }
     else {
       msg[mlen] = '\0';
-      printf("Received: %s\n", msg);
+      printf("\033[94mReceived from\033[0m %d: %s\n", sockfd, msg);
       mutmsgs.lock();
       msgs.push(msg);
       mutmsgs.unlock();
@@ -123,12 +140,12 @@ int main(int argc, char **argv) {
       // Get client info
       socklen_t addr_size = sizeof(struct sockaddr_in);
       int res = getpeername(sock_client, (struct sockaddr*)&addr, &addr_size);
-      printf("\033[32mClient connected: %s\033[0m\n", inet_ntoa(addr.sin_addr));
+      printf("\033[94mClient connected\033[0m: %d (%s)\n", sock_client, inet_ntoa(addr.sin_addr));
 
-      trcv.push_back(std::thread(&rcv_thread,sock_client));
       mutsocks.lock();
       socks.push_back(sock_client);
       mutsocks.unlock();
+      trcv.push_back(std::thread(&rcv_thread,sock_client));
     }
   }
 

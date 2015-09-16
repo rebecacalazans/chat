@@ -69,7 +69,6 @@ void rcv_thread(int sockfd) {
 int main(int argc, char **argv) {
 
   std::thread tsend;
-  std::vector<std::thread> trcv;
   int sockfd, sock_client;
   struct sockaddr_in addr;
 
@@ -105,16 +104,13 @@ int main(int argc, char **argv) {
     return 1;
   }
   else {
-    trcv.push_back(std::thread(&rcv_thread,sock_client));
+    std::thread(&rcv_thread,sock_client).detach();
     mutsocks.lock();
       socks.push_back(sock_client);
     mutsocks.unlock();
   }
   }
 
-  for(int i = 0; i < trcv.size(); i++) {
-  trcv[i].join();
-  }
     tsend.join();
   for(int i = 0; i < socks.size(); i++) {
     close(socks[i]);

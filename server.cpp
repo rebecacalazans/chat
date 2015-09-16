@@ -21,7 +21,6 @@ std::mutex mutmsgs, mutsocks;
 
 void send_thread() {
   int ok=1;
-  char msg[1024];
   while(ok) {
     mutmsgs.lock();
     bool e = msgs.empty();
@@ -30,7 +29,7 @@ void send_thread() {
     if(!e) {
 
       mutmsgs.lock();
-        strcpy(msg, msgs.front());
+        char* msg = msgs.front();
         msgs.pop();
       mutmsgs.unlock();
 
@@ -73,6 +72,8 @@ void send_thread() {
       } else {
         printf("\033[31mNo clients connected!\033[0m\n");
       }
+
+      delete msg;
     }
   }
 }

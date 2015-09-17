@@ -129,9 +129,11 @@ void rcv_thread(int sockfd) {
     struct winsize w;
     ioctl(STDOUT_FILENO, TIOCGWINSZ, &w);
     int col = w.ws_col - strlen(packet) + 9; // Get terminal size minus packet size (except escape sequences (9 chars))
+    /*
     int meslines = (strlen(message) + w.ws_col - 1) / w.ws_col-1;
     if (meslines >= 0)
       printf("\033[%dA", meslines);
+    */
 
     printf("\r%s", packet);
     for (int i = 0; i < col; ++i) {

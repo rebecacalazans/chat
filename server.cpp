@@ -18,7 +18,6 @@ std::vector<int> socks;
 std::queue<char*> msgs;
 std::mutex mutmsgs, mutsocks;
 
-
 void send_thread() {
   int ok=1;
   while(ok) {
@@ -27,7 +26,6 @@ void send_thread() {
     mutmsgs.unlock();
 
     if(!e) {
-
       mutmsgs.lock();
         char* msg = msgs.front();
         msgs.pop();
@@ -53,7 +51,6 @@ void send_thread() {
 
           int mlen = send(socks[i], msg, strlen(msg), 0);
           if(mlen == -1) {
-            //perror("Erro ao enviar mensagem socket %d", i);
             printf("\033[31mClient disconnected!\033[0m\n");
             close(socks[i]);
             toremove.push_back(i);
@@ -70,10 +67,10 @@ void send_thread() {
           mutsocks.unlock();
         }
       } else {
-        printf("\033[31mNo clients connected!\033[0m\n");
+        printf("\033[31mAll clients connected!\033[0m\n");
       }
 
-      delete msg;
+      free (msg);
     }
   }
 }
@@ -85,7 +82,6 @@ void rcv_thread(int sockfd) {
     memset(msg, 0, MAX);
     int mlen = recv(sockfd, msg, MAX,0);
     if(mlen == -1 || mlen == 0) {
-      //perror("Erro ao receber mensagem socket");
       close(sockfd);
       ok = 0;
     }

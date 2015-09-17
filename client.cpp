@@ -13,6 +13,23 @@
 #include <mutex>
 #define MAX 1024
 
+int colorlist[] = {
+  31, // red
+  32, // green
+  33, // yellow
+  34, // blue
+  35, // magenta
+  36, // cyan
+  37, // light gray
+  90, // dark gray
+  91, // light red
+  92, // light green
+  93, // light yellow
+  94, // light blue
+  95, // light magenta
+  96 // light cyan
+};
+
 int color;
 char name[20];
 char message[MAX];
@@ -42,7 +59,8 @@ void send_thread(int sockfd) {
   color = 0;
   for (int i = 0; i < (int)strlen(name); ++i)
     color += name[i];
-  color = (color % 7) + 31;
+  color = (color % (sizeof(colorlist)/sizeof(int)));
+  color = colorlist[color];
 
   char packet[MAX];
 
@@ -151,7 +169,6 @@ void rcv_thread(int sockfd) {
 }
 
 int main(int argc, char **argv) {
-
   std::thread tsend, trcv;
   int sockfd;
   struct sockaddr_in addr;

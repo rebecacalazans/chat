@@ -111,10 +111,13 @@ void send_thread(int sockfd) {
     }
     stopInput();
 
+    /*
     struct winsize w;
     ioctl(STDOUT_FILENO, TIOCGWINSZ, &w);
     int meslines = (strlen(message) + w.ws_col - 1) / w.ws_col;
     printf("\033[%dA", meslines);
+    */
+    printf("\033[1A");
 
     mutmessage.lock();
     sprintf(packet, "\033[%dm%s\033[0m: %s", color, name, message);

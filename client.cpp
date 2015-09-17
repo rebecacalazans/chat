@@ -13,6 +13,7 @@
 #include <mutex>
 #define MAX 1024
 
+int color;
 char name[20];
 char message[MAX];
 
@@ -38,7 +39,7 @@ void stopInput() {
 }
 
 void send_thread(int sockfd) {
-  int color = 0;
+  color = 0;
   for (int i = 0; i < (int)strlen(name); ++i)
     color += name[i];
   color = (color % 7) + 31;
@@ -131,7 +132,7 @@ void rcv_thread(int sockfd) {
     int col = w.ws_col - strlen(packet) + 9; // Get terminal size minus packet size (except escape sequences (9 chars))
     /*
     int meslines = (strlen(message) + w.ws_col - 1) / w.ws_col-1;
-    if (meslines >= 0)
+    if (meslines > 0)
       printf("\033[%dA", meslines);
     */
 
@@ -140,7 +141,7 @@ void rcv_thread(int sockfd) {
       printf(" ");
     }
 
-    printf("\n> ");
+    printf("\n\033[%dm%s\033[0m> ", color, name);
 
     mutmessage.lock();
     printf("%s", message);
@@ -179,11 +180,12 @@ int main(int argc, char **argv) {
   printf("Digite seu nome: ");
   fgets(name, 18, stdin);
   name[strlen(name) - 1] = '\0';
-  printf("> ");
-  fflush(stdout);
 
   tsend = std::thread(&send_thread, sockfd);
   trcv = std::thread(&rcv_thread, sockfd);
+
+  printf("\033[%dm%s\033[0m> ", color, name);
+  fflush(stdout);
 
   tsend.join();
   trcv.join();

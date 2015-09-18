@@ -23,6 +23,23 @@ std::mutex mutmsgs, mutsocks;
 
 char names[NAME_LEN][MAX_USERS];
 
+int colorlist[] = {
+  31, // red
+  32, // green
+  33, // yellow
+  34, // blue
+  35, // magenta
+  36, // cyan
+  37, // light gray
+  90, // dark gray
+  91, // light red
+  92, // light green
+  93, // light yellow
+  94, // light blue
+  95, // light magenta
+  96 // light cyan
+};
+
 void send_thread() {
   int ok=1;
   while(ok) {
@@ -82,6 +99,12 @@ void send_thread() {
 
 void rcv_thread(int sockfd) {
   int ok=1;
+  int color = 0;
+  for (int i = 0; i < (int)strlen(names[sockfd]); ++i)
+    color += names[i][sockfd];
+  color = (color % (sizeof(colorlist)/sizeof(int)));
+  color = colorlist[color];
+
   while(ok) {
     char* packet = (char*) malloc(PACKET_LEN);
     char* msg = (char*) malloc(MSG_LEN);
@@ -93,8 +116,7 @@ void rcv_thread(int sockfd) {
     }
     else {
       msg[mlen] = '\0';
-      sprintf(packet, "%s: %s", names[sockfd],msg);
-      printf("Teste: %s\n", packet);
+      sprintf(packet, "\033[%dm%s\033[0m: %s", color, names[sockfd],msg);
       printf("\033[94mReceived from\033[0m %d: %s\n", sockfd, msg);
       mutmsgs.lock();
       msgs.push(packet);

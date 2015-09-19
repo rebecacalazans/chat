@@ -12,23 +12,43 @@
 #include <queue>
 #include <mutex>
 
-#define MAX 1024
+const int NAME_LEN = 24;
+const int MSG_LEN = 1000;
+const int PACKET_LEN = NAME_LEN+MSG_LEN+20;
+const int MAX_USERS = 1024;
 
 std::vector<int> socks;
 std::queue<char*> msgs;
 std::mutex mutmsgs, mutsocks;
 
+char names[NAME_LEN][MAX_USERS];
+
+int colorlist[] = {
+  31, // red
+  32, // green
+  33, // yellow
+  34, // blue
+  35, // magenta
+  36, // cyan
+  37, // light gray
+  90, // dark gray
+  91, // light red
+  92, // light green
+  93, // light yellow
+  94, // light blue
+  95, // light magenta
+  96 // light cyan
+};
+
 void send_thread() {
-  int ok=1;
-  while(ok) {
     mutmsgs.lock();
     bool e = msgs.empty();
     mutmsgs.unlock();
 
     if(!e) {
       mutmsgs.lock();
-        char* msg = msgs.front();
-        msgs.pop();
+      char* msg = msgs.front();
+      msgs.pop();
       mutmsgs.unlock();
 
       mutsocks.lock();
@@ -72,25 +92,34 @@ void send_thread() {
 
       free (msg);
     }
-  }
 }
 
 void rcv_thread(int sockfd) {
   int ok=1;
+  int color = 0;
+  for (int i = 0; i < (int)strlen(names[sockfd]); ++i)
+    color += names[i][sockfd];
+  color = (color % (sizeof(colorlist)/sizeof(int)));
+  color = colorlist[color];
+
   while(ok) {
-    char* msg = (char*) malloc(MAX);
-    memset(msg, 0, MAX);
-    int mlen = recv(sockfd, msg, MAX,0);
+    char* packet = (char*) malloc(PACKET_LEN);
+    char* msg = (char*) malloc(MSG_LEN);
+    memset(msg, 0, MSG_LEN);
+    int mlen = recv(sockfd, msg, MSG_LEN,0);
     if(mlen == -1 || mlen == 0) {
       close(sockfd);
       ok = 0;
     }
     else {
       msg[mlen] = '\0';
+      sprintf(packet, "\033[%dm%s\033[0m: %s", color, names[sockfd],msg);
       printf("\033[94mReceived from\033[0m %d: %s\n", sockfd, msg);
       mutmsgs.lock();
-      msgs.push(msg);
+      msgs.push(packet);
       mutmsgs.unlock();
+      free(msg);
+      send_thread();
     }
   }
 }
@@ -124,8 +153,6 @@ int main(int argc, char **argv) {
     return 1;
   }
 
-  tsend = std::thread(&send_thread);
-
   while(1) {
     sock_client = accept(sockfd,0,0);
     if(sock_client == -1) {
@@ -137,11 +164,18 @@ int main(int argc, char **argv) {
       socklen_t addr_size = sizeof(struct sockaddr_in);
       int res = getpeername(sock_client, (struct sockaddr*)&addr, &addr_size);
       printf("\033[94mClient connected\033[0m: %d (%s)\n", sock_client, inet_ntoa(addr.sin_addr));
-
-      mutsocks.lock();
-      socks.push_back(sock_client);
-      mutsocks.unlock();
-      std::thread(&rcv_thread,sock_client).detach();
+      int mlen = recv(sock_client, names[sock_client], MSG_LEN,0);
+      if(mlen == -1 || mlen == 0) {
+        close(sock_client);
+      }
+      else {
+        names[sock_client][mlen]='\0';
+        mutsocks.lock();
+        socks.push_back(sock_client);
+        mutsocks.unlock();
+        send_thread();
+        std::thread(&rcv_thread,sock_client).detach();
+      }
     }
   }
 

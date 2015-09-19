@@ -119,11 +119,8 @@ void send_thread(int sockfd) {
     */
     printf("\033[1A");
 
-    mutmessage.lock();
-    sprintf(packet, "\033[%dm%s\033[0m: %s", color, name, message);
-    mutmessage.unlock();
 
-    int mlen = send(sockfd, packet, strlen(packet), 0);
+    int mlen = send(sockfd, message, strlen(message), 0);
     if (mlen == -1 || mlen == 0) {
       printf("Erro ao enviar mensagem");
       exit (1);
@@ -141,7 +138,7 @@ void rcv_thread(int sockfd) {
   while(1) {
     memset(packet, 0, MAX);
     int mlen = recv(sockfd, packet, MAX, 0);
-    if(mlen == -1) {
+    if(mlen == -1 || mlen == 0) {
       perror("Erro ao receber mensagem\n");
       exit (1);
     }
@@ -191,15 +188,22 @@ int main(int argc, char **argv) {
     addr.sin_addr.s_addr = inet_addr(argv[1]);
   memset(&addr.sin_zero,0,sizeof(addr.sin_zero));
 
+  printf("Digite seu nome: ");
+  fgets(name, 18, stdin);
+  name[strlen(name) - 1] = '\0';
+
   if(connect(sockfd,(struct sockaddr*)&addr,sizeof(addr)) != 0)
   {
     printf("Erro ao se conectar!\n");
     return 1;
   }
-
-  printf("Digite seu nome: ");
-  fgets(name, 18, stdin);
-  name[strlen(name) - 1] = '\0';
+  else {
+    int mlen = send(sockfd, name, strlen(name), 0);
+    if (mlen == -1 || mlen == 0) {
+      printf("Erro ao enviar mensagem");
+      exit (1);
+    }
+  }
 
   tsend = std::thread(&send_thread, sockfd);
   trcv = std::thread(&rcv_thread, sockfd);

@@ -41,8 +41,6 @@ int colorlist[] = {
 };
 
 void send_thread() {
-  int ok=1;
-  while(ok) {
     mutmsgs.lock();
     bool e = msgs.empty();
     mutmsgs.unlock();
@@ -94,7 +92,6 @@ void send_thread() {
 
       free (msg);
     }
-  }
 }
 
 void rcv_thread(int sockfd) {
@@ -122,6 +119,7 @@ void rcv_thread(int sockfd) {
       msgs.push(packet);
       mutmsgs.unlock();
       free(msg);
+      send_thread();
     }
   }
 }
@@ -155,8 +153,6 @@ int main(int argc, char **argv) {
     return 1;
   }
 
-  tsend = std::thread(&send_thread);
-
   while(1) {
     sock_client = accept(sockfd,0,0);
     if(sock_client == -1) {
@@ -177,6 +173,7 @@ int main(int argc, char **argv) {
         mutsocks.lock();
         socks.push_back(sock_client);
         mutsocks.unlock();
+        send_thread();
         std::thread(&rcv_thread,sock_client).detach();
       }
     }

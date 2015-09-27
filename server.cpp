@@ -113,7 +113,7 @@ void rcv_thread(int sockfd) {
     }
     else {
       msg[mlen] = '\0';
-      sprintf(packet, "\033[%dm%s\033[0m: %s", color, names[sockfd],msg);
+      sprintf(packet, "%s: %s", names[sockfd],msg);
       printf("\033[94mReceived from\033[0m %d: %s\n", sockfd, msg);
       mutmsgs.lock();
       msgs.push(packet);

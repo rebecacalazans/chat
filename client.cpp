@@ -16,9 +16,9 @@ const int NAME_LEN = 24;
 const int MSG_LEN = 1000;
 const short ncolors = 6;
 struct packet {
-  char name[NAME_LEN];
+  char name[NAME_LEN+1];
   short color;
-  char msg[MSG_LEN];
+  char msg[MSG_LEN+1];
 };
 const int PACKET_LEN = sizeof(struct packet);
 
@@ -32,6 +32,8 @@ WINDOW *chatwin, *typewin;
 std::mutex mutwin;
 
 int  input(WINDOW *win, char *str, int len, bool cont) {
+  int ymax, xmax;
+  getmaxyx(win, ymax, xmax);
   int i = 0;
   while(1) {
     int c = wgetch(win);
@@ -67,6 +69,9 @@ int  input(WINDOW *win, char *str, int len, bool cont) {
 
     mutwin.lock();
     getyx(win, y, x);
+    if(y == ymax && x == xmax) {
+      wresize(win, ++ymax, xmax);
+    }
     if (cont) {
       wattron(win, COLOR_PAIR(102));
       mvwprintw(win, 0, ncolums - 10, "%d/%d", i, len);
@@ -153,6 +158,14 @@ int sockfd;
 int main(int argc, char **argv) {
   std::thread tsend, trcv;
   struct sockaddr_in addr;
+  unsigned int port = 5600;
+  for (int i = 0; i < argc; i++) {
+    if(strcmp(argv[i],"--port") == 0) {
+      port = (short)atoi(argv[i+1]);
+      printf("porta: %d\n", port);
+      break;
+    }
+  }
 
   //Iniciando curses
   WINDOW *namewin;
@@ -208,7 +221,7 @@ int main(int argc, char **argv) {
   }
 
   addr.sin_family = AF_INET;
-  addr.sin_port   = htons(5600);
+  addr.sin_port   = htons(port);
   if (argc < 2)
     addr.sin_addr.s_addr = inet_addr("187.45.160.148");
   else

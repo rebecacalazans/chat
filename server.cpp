@@ -17,9 +17,9 @@ const int MSG_LEN = 1000;
 const int MAX_USERS = 1024;
 const short ncolors = 6;
 struct packet {
-  char name [NAME_LEN];
+  char name [NAME_LEN+1];
   short color;
-  char msg[MSG_LEN];
+  char msg[MSG_LEN+1];
 };
 const int PACKET_LEN = sizeof(struct packet);;
 
@@ -115,6 +115,7 @@ int main(int argc, char **argv) {
 
   std::thread tsend;
   int sockfd, sock_client;
+  unsigned int port;
   struct sockaddr_in addr;
 
   sockfd = socket(AF_INET, SOCK_STREAM, 0);
@@ -123,10 +124,19 @@ int main(int argc, char **argv) {
     perror("Erro ao criar socket");
     return 1;
   }
+  port = 5600;
+  for (int i = 0; i < argc; i++) {
+    if(strcmp(argv[i],"--port") == 0) {
+      port = (short)atoi(argv[i+1]);
+      printf("porta: %d\n", port);
+      break;
+    }
+  }
+
 
 
   addr.sin_family = AF_INET;
-  addr.sin_port   = htons(5600);
+  addr.sin_port   = htons(port);
   addr.sin_addr.s_addr = INADDR_ANY;
 
   memset(&addr.sin_zero,0,sizeof(addr.sin_zero));

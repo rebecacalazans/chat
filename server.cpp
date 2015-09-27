@@ -14,31 +14,20 @@
 
 const int NAME_LEN = 24;
 const int MSG_LEN = 1000;
-const int PACKET_LEN = NAME_LEN+MSG_LEN+20;
 const int MAX_USERS = 1024;
+const short ncolors = 6;
+struct packet {
+  char name [NAME_LEN];
+  short color;
+  char msg[MSG_LEN];
+};
+const int PACKET_LEN = sizeof(struct packet);;
 
 std::vector<int> socks;
-std::queue<char*> msgs;
+std::queue<struct packet*> msgs;
 std::mutex mutmsgs, mutsocks;
 
 char names[NAME_LEN][MAX_USERS];
-
-int colorlist[] = {
-  31, // red
-  32, // green
-  33, // yellow
-  34, // blue
-  35, // magenta
-  36, // cyan
-  37, // light gray
-  90, // dark gray
-  91, // light red
-  92, // light green
-  93, // light yellow
-  94, // light blue
-  95, // light magenta
-  96 // light cyan
-};
 
 void send_thread() {
     mutmsgs.lock();
@@ -47,7 +36,7 @@ void send_thread() {
 
     if(!e) {
       mutmsgs.lock();
-      char* msg = msgs.front();
+      struct packet* msg = msgs.front();
       msgs.pop();
       mutmsgs.unlock();
 
@@ -69,7 +58,7 @@ void send_thread() {
 
           printf("\033[94mSending to client\033[0m %d: ", socks[i]);
 
-          int mlen = send(socks[i], msg, strlen(msg), 0);
+          int mlen = send(socks[i], msg, PACKET_LEN, 0);
           if(mlen == -1) {
             printf("\033[31mClient disconnected!\033[0m\n");
             close(socks[i]);
@@ -96,29 +85,27 @@ void send_thread() {
 
 void rcv_thread(int sockfd) {
   int ok=1;
-  int color = 0;
+  short color = 0;
   for (int i = 0; i < (int)strlen(names[sockfd]); ++i)
-    color += names[i][sockfd];
-  color = (color % (sizeof(colorlist)/sizeof(int)));
-  color = colorlist[color];
+    color += names[sockfd][i];
+  color = color % ncolors + 1;
 
   while(ok) {
-    char* packet = (char*) malloc(PACKET_LEN);
-    char* msg = (char*) malloc(MSG_LEN);
-    memset(msg, 0, MSG_LEN);
-    int mlen = recv(sockfd, msg, MSG_LEN,0);
+    struct packet* pckt = (struct packet*) malloc(PACKET_LEN);
+    memset((char*)pckt, 0, PACKET_LEN);
+    strcpy(pckt->name,names[sockfd]);
+    pckt->color = color;
+    int mlen = recv(sockfd, pckt->msg, MSG_LEN,0);
     if(mlen == -1 || mlen == 0) {
       close(sockfd);
       ok = 0;
     }
     else {
-      msg[mlen] = '\0';
-      sprintf(packet, "%s: %s", names[sockfd],msg);
-      printf("\033[94mReceived from\033[0m %d: %s\n", sockfd, msg);
+      pckt->msg[mlen] = '\0';
+      printf("\033[94mReceived from\033[0m %d: %s\n", sockfd, pckt->msg);
       mutmsgs.lock();
-      msgs.push(packet);
+      msgs.push(pckt);
       mutmsgs.unlock();
-      free(msg);
       send_thread();
     }
   }

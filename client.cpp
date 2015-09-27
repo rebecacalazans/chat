@@ -14,11 +14,17 @@
 
 const int NAME_LEN = 24;
 const int MSG_LEN = 1000;
-const int PACKET_LEN = NAME_LEN+MSG_LEN+20;
+const short ncolors = 6;
+struct packet {
+  char name[NAME_LEN];
+  short color;
+  char msg[MSG_LEN];
+};
+const int PACKET_LEN = sizeof(struct packet);
 
 char name[NAME_LEN];
 char msg[MSG_LEN];//Usado para enviar
-char packet[PACKET_LEN];//Usado pra receber
+struct packet *pckt;
 int ncolums = 0, nlines = 0;
 
 WINDOW *chatwin, *typewin;
@@ -62,9 +68,9 @@ int  input(WINDOW *win, char *str, int len, bool cont) {
     mutwin.lock();
     getyx(win, y, x);
     if (cont) {
-      wattron(win, COLOR_PAIR(2));
+      wattron(win, COLOR_PAIR(102));
       mvwprintw(win, 0, ncolums - 10, "%d/%d", i, len);
-      wattroff(win, COLOR_PAIR(2));
+      wattroff(win, COLOR_PAIR(102));
     }
     wmove(win, y,x);
     wrefresh(win);
@@ -80,15 +86,23 @@ void exit_(void) {
   exit(0);
 }
 
-void send_thread(int sockfd) {
+void init_colors() {
+  init_pair(1,COLOR_BLUE,COLOR_BLACK);
+  init_pair(2,COLOR_GREEN,COLOR_BLACK);
+  init_pair(3,COLOR_CYAN,COLOR_BLACK);
+  init_pair(4,COLOR_MAGENTA,COLOR_BLACK);
+  init_pair(5,COLOR_YELLOW,COLOR_BLACK);
+  init_pair(6,COLOR_RED,COLOR_BLACK);
+}
 
+void send_thread(int sockfd) {
   while(1) {
 
     wclear(typewin);
-    wattron(typewin, COLOR_PAIR(2));
+    wattron(typewin, COLOR_PAIR(102));
     mvwhline(typewin, 0, 0, ' ', ncolums);
     mvwprintw(typewin, 0, ncolums - 10, "0/%d", MSG_LEN);
-    wattroff(typewin, COLOR_PAIR(2));
+    wattroff(typewin, COLOR_PAIR(102));
 
     mutwin.lock();
     mvwprintw(typewin, 1, 0, ">> ");
@@ -107,20 +121,25 @@ void send_thread(int sockfd) {
 }
 
 void rcv_thread(int sockfd) {
+  pckt = (struct packet*)malloc(PACKET_LEN);
 
   while(1) {
-    memset(packet, 0, PACKET_LEN);
+    memset(pckt, 0, PACKET_LEN);
 
-    int mlen = recv(sockfd, packet, PACKET_LEN, 0);
+    int mlen = recv(sockfd, pckt, PACKET_LEN, 0);
     if(mlen == -1 || mlen == 0) {
       perror("Erro ao receber mensagem\n");
       exit_();
     }
-    packet[mlen] = '\0';
     int y,x;
 
     getyx(typewin, y, x);
-    wprintw(chatwin, "%s\n", packet);
+
+
+    wattron(chatwin, COLOR_PAIR(pckt->color));
+    wprintw(chatwin, "%s: ", pckt->name);
+    wattroff(chatwin, COLOR_PAIR(pckt->color));
+    wprintw(chatwin, "%s\n", pckt->msg);
 
     mutwin.lock();
     wrefresh(chatwin);
@@ -142,12 +161,13 @@ int main(int argc, char **argv) {
   noecho();
 
   start_color();
+  init_colors();
 
   init_color(COLOR_BLACK,0,0,0);
-  init_pair(1,COLOR_WHITE,COLOR_BLACK);
-  init_pair(2,COLOR_BLACK,COLOR_WHITE);
+  init_pair(101,COLOR_WHITE,COLOR_BLACK);
+  init_pair(102,COLOR_BLACK,COLOR_WHITE);
 
-  bkgd(COLOR_PAIR(4));
+  bkgd(COLOR_PAIR(101));
 
   getmaxyx(stdscr, nlines, ncolums);
 
@@ -158,9 +178,9 @@ int main(int argc, char **argv) {
   namewin = newwin(5, NAME_LEN+4, nlines/2-2, (ncolums-NAME_LEN-4)/2);
   keypad(namewin, TRUE);
 
-  wbkgd(chatwin,COLOR_PAIR(1));
-  wbkgd(typewin,COLOR_PAIR(1));
-  wbkgd(namewin,COLOR_PAIR(1));
+  wbkgd(chatwin,COLOR_PAIR(101));
+  wbkgd(typewin,COLOR_PAIR(101));
+  wbkgd(namewin,COLOR_PAIR(101));
   wattron(namewin, A_BOLD);
   wattron(chatwin, A_BOLD);
 
